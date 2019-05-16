@@ -363,36 +363,38 @@ def describe(df, bins=10, check_correlation=True, correlation_threshold=0.9, cor
         ldesc = {col: s for col, s in pool.map(local_multiprocess_func, df.iteritems())}
         pool.close()
 
-    # Get correlations
-    dfcorrPear = df.corr(method="pearson")
-    dfcorrSpear = df.corr(method="spearman")
+    numeric_dtypes = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
+    if not df.select_dtypes(numeric_types).empty:
+        # Get correlations
+        dfcorrPear = df.corr(method="pearson")
+        dfcorrSpear = df.corr(method="spearman")
 
-    # Check correlations between variable
-    if check_correlation is True:
-        ''' TODO: corr(x,y) > 0.9 and corr(y,z) > 0.9 does not imply corr(x,z) > 0.9
-        If x~y and y~z but not x~z, it would be better to delete only y
-        Better way would be to find out which variable causes the highest increase in multicollinearity.
-        '''
-        corr = dfcorrPear.copy()
-        for x, corr_x in corr.iterrows():
-            if correlation_overrides and x in correlation_overrides:
-                continue
-
-            for y, corr in corr_x.iteritems():
-                if x == y: break
-
-                if corr > correlation_threshold:
-                    ldesc[x] = pd.Series(['CORR', y, corr], index=['type', 'correlation_var', 'correlation'])
-
-        if check_recoded:
-            categorical_variables = [(name, data) for (name, data) in df.iteritems() if base.get_vartype(data)=='CAT']
-            for (name1, data1), (name2, data2) in itertools.combinations(categorical_variables, 2):
-                if correlation_overrides and name1 in correlation_overrides:
+        # Check correlations between variable
+        if check_correlation is True:
+            ''' TODO: corr(x,y) > 0.9 and corr(y,z) > 0.9 does not imply corr(x,z) > 0.9
+            If x~y and y~z but not x~z, it would be better to delete only y
+            Better way would be to find out which variable causes the highest increase in multicollinearity.
+            '''
+            corr = dfcorrPear.copy()
+            for x, corr_x in corr.iterrows():
+                if correlation_overrides and x in correlation_overrides:
                     continue
 
-                confusion_matrix=pd.crosstab(data1,data2)
-                if confusion_matrix.values.diagonal().sum() == len(df):
-                    ldesc[name1] = pd.Series(['RECODED', name2], index=['type', 'correlation_var'])
+                for y, corr in corr_x.iteritems():
+                    if x == y: break
+
+                    if corr > correlation_threshold:
+                        ldesc[x] = pd.Series(['CORR', y, corr], index=['type', 'correlation_var', 'correlation'])
+
+            if check_recoded:
+                categorical_variables = [(name, data) for (name, data) in df.iteritems() if base.get_vartype(data)=='CAT']
+                for (name1, data1), (name2, data2) in itertools.combinations(categorical_variables, 2):
+                    if correlation_overrides and name1 in correlation_overrides:
+                        continue
+
+                    confusion_matrix=pd.crosstab(data1,data2)
+                    if confusion_matrix.values.diagonal().sum() == len(df):
+                        ldesc[name1] = pd.Series(['RECODED', name2], index=['type', 'correlation_var'])
 
     # Convert ldesc to a DataFrame
     names = []
